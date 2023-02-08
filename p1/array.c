@@ -37,24 +37,25 @@ void apply_delay (int delay) {
     while ( i -- > 0 );
 }
 
-int increment (int id, int iterations, int delay, struct array *array) {
+void *increment (void *pointer) {
 
+    struct thread_arguments *arguments = pointer;
+    int delay = arguments -> delay;
     int position, value;
-    int i = iterations;
 
-    while ( i -- > 0 ) {
+    while ( arguments -> iterations -- ) {
 
-        position = rand() % array -> size;
+        position = rand() % arguments -> array -> size;
 
-        printf("%d increasing position %d\n", id, position);
+        printf("%d increasing position %d\n", arguments -> thread_number , position);
 
-        value = array -> values [position];
+        value = arguments -> array -> values [position];
         apply_delay (delay);
 
         value ++;
         apply_delay (delay);
 
-        array -> values [position] = value;
+        arguments -> array -> values [position] = value;
         apply_delay (delay);
     }
     return 0;
@@ -72,6 +73,7 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         exit(1);
     }
 
+    printf ("a");
     int i = options.num_threads;
     while ( i -- > 0 ) {
         
@@ -87,6 +89,22 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         }
     }
     return NULL;
+}
+
+void close (struct options options, struct array *array, struct thread_info *threads) {
+ 
+    int i = options.num_threads;
+    //while ( i -- > 0 )
+    for (int i = 0; i < options.num_threads; i++)
+        pthread_join (threads[i].id, NULL);
+
+    i = options.num_threads;
+    while ( i -- > 0 )
+        free (threads[i].arguments);
+
+    free (array -> values);
+    free (threads);
+
 }
 
 
@@ -120,10 +138,8 @@ int main (int argc, char **argv) {
 
     initialize_array (&array, options.num_threads);
 
-    //increment (0, options.iterations, options.delay, &array);
-
     threads = start_threads (options, &array);
-    wait (options, &array, threads);
+    close (options, &array, threads);
 
     print_array (array);
 
