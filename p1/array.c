@@ -12,6 +12,12 @@ struct array {
     int *values;
 };
 
+void initialize_array (struct array *array, int array_size) {
+    array -> size = array_size;
+    array -> values  = malloc (array -> size * sizeof (int));
+    memset (array -> values, 0, array -> size * sizeof (int));
+}
+
 struct thread_arguments {
     int iterations;         // number of increments
     int thread_number;      // application defined thread
@@ -82,10 +88,7 @@ int main (int argc, char **argv) {
 
     read_options (argc, argv, &options);
 
-    array.size = options.array_size;
-    array.values  = malloc (array.size * sizeof (int));
-
-    memset (array.values, 0, array.size * sizeof (int));
+    initialize_array (&array, options.num_threads);
 
     increment (0, options.iterations, options.delay, &array);
 
