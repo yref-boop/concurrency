@@ -12,8 +12,20 @@ struct array {
     int *values;
 };
 
+struct thread_arguments {
+    int iterations;         // number of increments
+    int thread_number;      // application defined thread
+    int delay;              // delay between operations
+    struct array *array;    //access to shared array
+};
+
+struct thread_info {
+    pthread_t   id;
+    struct thread_arguments *arguments;
+};
 
 void apply_delay (int delay) {
+
     int i = delay * DELAY_SCALE;
     while ( i -- > 0 );
 }
@@ -56,8 +68,7 @@ void print_array (struct array array) {
 }
 
 
-int main (int argc, char **argv)
-{
+int main (int argc, char **argv) {
     struct options  options;
     struct array    array;
 
