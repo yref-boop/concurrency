@@ -1,8 +1,10 @@
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include "options.h"
 
 #define DELAY_SCALE 1000
@@ -14,6 +16,7 @@ struct array {
 };
 
 void initialize_array (struct array *array, int array_size) {
+
     array -> size = array_size;
     array -> values  = malloc (array -> size * sizeof (int));
     memset (array -> values, 0, array -> size * sizeof (int));
@@ -23,7 +26,7 @@ struct thread_arguments {
     int iterations;         // number of increments
     int thread_number;      // application defined thread
     int delay;              // delay between operations
-    struct array *array;    //access to shared array
+    struct array *array;    // access to shared array
 };
 
 struct thread_info {
@@ -45,9 +48,10 @@ void *increment (void *pointer) {
 
     while ( arguments -> iterations -- ) {
 
-        position = rand() % arguments -> array -> size;
+        position = rand() % (arguments -> array -> size);
 
-        printf("%d increasing position %d\n", arguments -> thread_number , position);
+        printf("thread #%d increasing position %d\n",
+               arguments -> thread_number , position);
 
         value = arguments -> array -> values [position];
         apply_delay (delay);
@@ -58,7 +62,7 @@ void *increment (void *pointer) {
         arguments -> array -> values [position] = value;
         apply_delay (delay);
     }
-    return 0;
+    return NULL;
 }
 
 struct thread_info *start_threads (struct options options, struct array *array) {
@@ -73,40 +77,23 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         exit(1);
     }
 
-    printf ("a");
     int i = options.num_threads;
     while ( i -- > 0 ) {
-        
+
         threads[i].arguments = malloc (sizeof (struct thread_arguments));
 
         threads[i].arguments -> iterations = options.num_threads;
         threads[i].arguments -> thread_number = i;
         threads[i].arguments -> delay = options.delay;
+        threads[i].arguments -> array = array;
 
         if (0 != pthread_create(&threads[i].id, NULL, increment, threads[i].arguments)) {
             printf ("could not create thread #%d", i);
             exit (1);
         }
     }
-    return NULL;
+    return threads;
 }
-
-void close (struct options options, struct array *array, struct thread_info *threads) {
- 
-    int i = options.num_threads;
-    //while ( i -- > 0 )
-    for (int i = 0; i < options.num_threads; i++)
-        pthread_join (threads[i].id, NULL);
-
-    i = options.num_threads;
-    while ( i -- > 0 )
-        free (threads[i].arguments);
-
-    free (array -> values);
-    free (threads);
-
-}
-
 
 void print_array (struct array array) {
     int total = 0;
@@ -120,6 +107,23 @@ void print_array (struct array array) {
 }
 
 
+void wait (struct options options, struct array *array, struct thread_info *threads) {
+ 
+    int i = options.num_threads;
+    while ( i -- > 0 )
+        pthread_join (threads[i].id, NULL);
+
+    print_array (*array);
+
+    i = options.num_threads;
+    while ( i -- > 0 )
+        free (threads[i].arguments);
+
+    free (threads);
+    free (array -> values);
+}
+
+
 int main (int argc, char **argv) {
 
     struct options      options;
@@ -128,7 +132,7 @@ int main (int argc, char **argv) {
 
     srand (time (NULL));
 
-    // Default values for the options
+    // default option values
     options.num_threads  = 5;
     options.array_size   = 10;
     options.iterations   = 100;
@@ -139,11 +143,7 @@ int main (int argc, char **argv) {
     initialize_array (&array, options.num_threads);
 
     threads = start_threads (options, &array);
-    close (options, &array, threads);
-
-    print_array (array);
-
-    free (array.values);
+    wait (options, &array, threads);
 
     return 0;
 }
