@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,8 +57,36 @@ int increment (int id, int iterations, int delay, struct array *array) {
         array -> values [position] = value;
         apply_delay (delay);
     }
-
     return 0;
+}
+
+struct thread_info *start_threads (struct options options, struct array *array) {
+
+    struct thread_info *threads;
+
+    printf ("creating %d threads\n", options.num_threads);
+    threads = malloc (sizeof (struct thread_info) * options.num_threads);
+
+    if (threads == NULL) {
+        printf ("not enough memory");
+        exit(1);
+    }
+
+    int i = options.num_threads;
+    while ( i -- > 0 ) {
+        
+        threads[i].arguments = malloc (sizeof (struct thread_arguments));
+
+        threads[i].arguments -> iterations = options.num_threads;
+        threads[i].arguments -> thread_number = i;
+        threads[i].arguments -> delay = options.delay;
+
+        if (0 != pthread_create(&threads[i].id, NULL, increment, threads[i].arguments)) {
+            printf ("could not create thread #%d", i);
+            exit (1);
+        }
+    }
+    return NULL;
 }
 
 
@@ -69,14 +98,15 @@ void print_array (struct array array) {
         total += array.values[i];
         printf ("%d ", array.values[i]);
     }
-
     printf ("\ntotal: %d\n", total);
 }
 
 
 int main (int argc, char **argv) {
-    struct options  options;
-    struct array    array;
+
+    struct options      options;
+    struct array        array;
+    struct thread_info  *threads;
 
     srand (time (NULL));
 
@@ -90,7 +120,10 @@ int main (int argc, char **argv) {
 
     initialize_array (&array, options.num_threads);
 
-    increment (0, options.iterations, options.delay, &array);
+    //increment (0, options.iterations, options.delay, &array);
+
+    threads = start_threads (options, &array);
+    wait (options, &array, threads);
 
     print_array (array);
 
