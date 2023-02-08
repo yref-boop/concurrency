@@ -9,7 +9,7 @@ static struct option long_options[] = {
 	  .has_arg = required_argument,
 	  .flag = NULL,
 	  .val = 't'},
-	{ .name = "size",
+	{ .name = "array_size",
 	  .has_arg = required_argument,
 	  .flag = NULL,
 	  .val = 's'},
@@ -34,7 +34,7 @@ static void usage(int i)
 		"Usage:  array [OPTION]\n"
 		"Options:\n"
 		"  -t n, --threads=<n>: number of threads\n"
-		"  -s n, --size=<n>: array size\n"
+		"  -s n, --array_size=<n>: array size\n"
 		"  -i n, --iterations=<n>: number of iterations\n"
 		"  -d n, --delay=<n>: delay between buffer ops\n"
 		"  -h, --help: this message\n\n"
@@ -71,7 +71,7 @@ int handle_options(int argc, char **argv, struct options *opt)
 			break;
 
 		case 's':
-			if (!get_uint(optarg, &opt->size) || opt->size == 0) {
+			if (!get_uint(optarg, &opt->array_size) || opt->array_size == 0) {
 				printf("'%s': is not an integer > 0\n",
 				       optarg);
 				usage(-3);

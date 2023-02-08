@@ -3,7 +3,7 @@
 
 struct options {
 	int num_threads;
-	int size;
+	int array_size;
 	int iterations;
 	int delay;
 };

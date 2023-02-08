@@ -9,75 +9,78 @@
 
 struct array {
     int size;
-    int *arr;
+    int *values;
 };
 
 
-void apply_delay(int delay) {
-    for(int i = 0; i < delay * DELAY_SCALE; i++); // waste time
+void apply_delay (int delay) {
+    int i = delay * DELAY_SCALE;
+    while ( i -- > 0 );
 }
 
+int increment (int id, int iterations, int delay, struct array *array) {
 
-int increment(int id, int iterations, int delay, struct array *arr)
-{
-    int pos, val;
+    int position, value;
+    int i = iterations;
 
-    for(int i = 0; i < iterations; i++) {
-        pos = rand() % arr->size;
+    while ( i -- > 0 ) {
 
-        printf("%d increasing position %d\n", id, pos);
+        position = rand() % array -> size;
 
-        val = arr->arr[pos];
-        apply_delay(delay);
+        printf("%d increasing position %d\n", id, position);
 
-        val ++;
-        apply_delay(delay);
+        value = array -> values [position];
+        apply_delay (delay);
 
-        arr->arr[pos] = val;
-        apply_delay(delay);
+        value ++;
+        apply_delay (delay);
+
+        array -> values [position] = value;
+        apply_delay (delay);
     }
 
     return 0;
 }
 
 
-void print_array(struct array arr) {
+void print_array (struct array array) {
     int total = 0;
+    int i = array.size;
 
-    for(int i = 0; i < arr.size; i++) {
-        total += arr.arr[i];
-        printf("%d ", arr.arr[i]);
+    while ( i -- > 0 ) {
+        total += array.values[i];
+        printf ("%d ", array.values[i]);
     }
 
-    printf("\nTotal: %d\n", total);
+    printf ("\ntotal: %d\n", total);
 }
 
 
 int main (int argc, char **argv)
 {
-    struct options       opt;
-    struct array         arr;
+    struct options  options;
+    struct array    array;
 
-    srand(time(NULL));
+    srand (time (NULL));
 
     // Default values for the options
-    opt.num_threads  = 5;
-    opt.size         = 10;
-    opt.iterations   = 100;
-    opt.delay        = 1000;
+    options.num_threads  = 5;
+    options.array_size   = 10;
+    options.iterations   = 100;
+    options.delay        = 1000;
 
-    read_options(argc, argv, &opt);
+    read_options (argc, argv, &options);
 
-    arr.size = opt.size;
-    arr.arr  = malloc(arr.size * sizeof(int));
+    array.size = options.array_size;
+    array.values  = malloc (array.size * sizeof (int));
 
-    memset(arr.arr, 0, arr.size * sizeof(int));
+    memset (array.values, 0, array.size * sizeof (int));
 
-    increment(0, opt.iterations, opt.delay, &arr);
+    increment (0, options.iterations, options.delay, &array);
 
+    print_array (array);
 
-    print_array(arr);
-
+    free (array.values);
 
     return 0;
 }
