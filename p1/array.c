@@ -133,7 +133,6 @@ void print_array (struct array array) {
     printf ("\ntotal: %d\n", total);
 }
 
-
 void wait (struct options options, struct array *array, struct thread_info *threads) {
  
     int i = options.num_threads;
@@ -146,12 +145,11 @@ void wait (struct options options, struct array *array, struct thread_info *thre
     while ( i -- > 0 )
         free (threads[i].arguments);
 
-    i = options.num_threads;
+    i = array -> size;
     while ( i -- > 0 ) {
 		pthread_mutex_destroy (array -> mutexes [i]);
 		free (array -> mutexes [i]);
     }
-
     free (array -> mutexes);
     free (threads);
     free (array -> values);
