@@ -13,13 +13,20 @@
 struct array {
     int size;
     int *values;
+    pthread_mutex_t *mutex;
 };
 
 void initialize_array (struct array *array, int array_size) {
 
+    pthread_mutex_t *mutex;
+
     array -> size = array_size;
     array -> values  = malloc (array -> size * sizeof (int));
     memset (array -> values, 0, array -> size * sizeof (int));
+
+    mutex = malloc (sizeof(pthread_mutex_t));
+    pthread_mutex_init (mutex, NULL);
+    array -> mutex = mutex;
 }
 
 struct thread_arguments {
@@ -50,6 +57,8 @@ void *increment (void *pointer) {
 
         position = rand() % (arguments -> array -> size);
 
+        pthread_mutex_lock (arguments -> array -> mutex);
+
         printf("thread #%d increasing position %d\n",
                arguments -> thread_number , position);
 
@@ -61,6 +70,8 @@ void *increment (void *pointer) {
 
         arguments -> array -> values [position] = value;
         apply_delay (delay);
+
+        pthread_mutex_unlock (arguments -> array -> mutex);
     }
     return NULL;
 }
@@ -119,6 +130,7 @@ void wait (struct options options, struct array *array, struct thread_info *thre
     while ( i -- > 0 )
         free (threads[i].arguments);
 
+    pthread_mutex_destroy (array -> mutex);
     free (threads);
     free (array -> values);
 }
@@ -140,7 +152,7 @@ int main (int argc, char **argv) {
 
     read_options (argc, argv, &options);
 
-    initialize_array (&array, options.num_threads);
+    initialize_array (&array, options.array_size);
 
     threads = start_threads (options, &array);
     wait (options, &array, threads);
