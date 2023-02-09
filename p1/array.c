@@ -13,20 +13,36 @@
 struct array {
     int size;
     int *values;
-    pthread_mutex_t *mutex;
+    pthread_mutex_t **mutexes;
 };
 
 void initialize_array (struct array *array, int array_size) {
 
-    pthread_mutex_t *mutex;
+    pthread_mutex_t **mutexes;
 
     array -> size = array_size;
     array -> values  = malloc (array -> size * sizeof (int));
     memset (array -> values, 0, array -> size * sizeof (int));
 
-    mutex = malloc (sizeof(pthread_mutex_t));
-    pthread_mutex_init (mutex, NULL);
-    array -> mutex = mutex;
+    mutexes = malloc (sizeof(pthread_mutex_t) * (array -> size));
+
+    if (mutexes == NULL) {
+        printf ("not enough memory\n");
+        exit(1);
+    }
+
+    int i = array -> size;
+    while (i -- >  0) {
+
+	    mutexes [i] = malloc (sizeof (pthread_mutex_t));
+
+        if (mutexes [i] == NULL) {
+            printf ("not enough memory\n");
+            exit (1);
+        }
+        pthread_mutex_init (mutexes [i], NULL);
+	}
+    array -> mutexes = mutexes;
 }
 
 struct thread_arguments {
@@ -57,7 +73,7 @@ void *increment (void *pointer) {
 
         position = rand() % (arguments -> array -> size);
 
-        pthread_mutex_lock (arguments -> array -> mutex);
+        pthread_mutex_lock (arguments -> array -> mutexes [position]);
 
         printf("thread #%d increasing position %d\n",
                arguments -> thread_number , position);
@@ -71,7 +87,7 @@ void *increment (void *pointer) {
         arguments -> array -> values [position] = value;
         apply_delay (delay);
 
-        pthread_mutex_unlock (arguments -> array -> mutex);
+        pthread_mutex_unlock (arguments -> array -> mutexes [position]);
     }
     return NULL;
 }
@@ -130,7 +146,13 @@ void wait (struct options options, struct array *array, struct thread_info *thre
     while ( i -- > 0 )
         free (threads[i].arguments);
 
-    pthread_mutex_destroy (array -> mutex);
+    i = options.num_threads;
+    while ( i -- > 0 ) {
+		pthread_mutex_destroy (array -> mutexes [i]);
+		free (array -> mutexes [i]);
+    }
+
+    free (array -> mutexes);
     free (threads);
     free (array -> values);
 }
