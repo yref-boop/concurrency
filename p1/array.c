@@ -93,7 +93,7 @@ struct thread_info *start_threads (struct options options, struct array *array) 
 
         threads[i].arguments = malloc (sizeof (struct thread_arguments));
 
-        threads[i].arguments -> iterations = options.num_threads;
+        threads[i].arguments -> iterations = options.iterations;
         threads[i].arguments -> thread_number = i;
         threads[i].arguments -> delay = options.delay;
         threads[i].arguments -> array = array;
@@ -144,7 +144,6 @@ int main (int argc, char **argv) {
 
     srand (time (NULL));
 
-    // default option values
     options.num_threads  = 5;
     options.array_size   = 10;
     options.iterations   = 100;
