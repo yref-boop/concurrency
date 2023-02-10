@@ -92,19 +92,55 @@ void *increment (void *pointer) {
     return NULL;
 }
 
+void *swap (void *pointer) {
+
+    struct thread_arguments *arguments = pointer;
+    int delay = arguments -> delay;
+    int position1, position2, aux_value;
+
+    while ( arguments -> iterations -- ) {
+
+        position1 = rand() % (arguments -> array -> size);
+        do
+            position2 = rand() % (arguments -> array -> size);
+        while (position1 == position2);
+
+        pthread_mutex_lock (arguments -> array -> mutexes [position1]);
+        if (pthread_mutex_trylock (arguments -> array -> mutexes [position2])) {
+            pthread_mutex_unlock (arguments -> array -> mutexes [position1]);
+            continue;
+        }
+
+        aux_value = arguments -> array -> values [position1];
+        apply_delay (delay);
+
+        printf ( "thread %d swapping values at position %d & %d\n", arguments -> thread_number, position1, position2);
+
+        arguments -> array -> values [position1] = arguments -> array -> values [position2];
+        apply_delay (delay);
+
+        arguments -> array -> values [position2] = aux_value;
+        apply_delay (delay);
+
+        pthread_mutex_unlock (arguments -> array -> mutexes [position1]);
+        pthread_mutex_unlock (arguments -> array -> mutexes [position2]);
+    }
+    return NULL;
+}
+
 struct thread_info *start_threads (struct options options, struct array *array) {
 
     struct thread_info *threads;
 
-    printf ("creating %d threads\n", options.num_threads);
-    threads = malloc (sizeof (struct thread_info) * options.num_threads);
+    printf ("creating %d threads\n", options.num_threads * 2);
+    threads = malloc (sizeof (struct thread_info) * options.num_threads * 2);
 
     if (threads == NULL) {
         printf ("not enough memory");
         exit(1);
     }
 
-    int i = options.num_threads;
+    int i = options.num_threads * 2;
     while ( i -- > 0 ) {
 
         threads[i].arguments = malloc (sizeof (struct thread_arguments));
@@ -114,9 +150,17 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         threads[i].arguments -> delay = options.delay;
         threads[i].arguments -> array = array;
 
-        if (0 != pthread_create(&threads[i].id, NULL, increment, threads[i].arguments)) {
-            printf ("could not create thread #%d", i);
-            exit (1);
+        if ( i < options.num_threads) {
+            if (0 != pthread_create (&threads[i].id, NULL, increment, threads[i].arguments)) {
+                printf ("could not create thread #%d", i);
+                exit (1);
+            }
+        }
+        else {
+            if (0 != pthread_create (&threads[i]. id, NULL, swap, threads[i].arguments)) {
+                printf ("could not create thread #%d", i);
+                exit (1);
+            }
         }
     }
     return threads;
@@ -135,13 +179,13 @@ void print_array (struct array array) {
 
 void wait (struct options options, struct array *array, struct thread_info *threads) {
  
-    int i = options.num_threads;
+    int i = options.num_threads * 2;
     while ( i -- > 0 )
         pthread_join (threads[i].id, NULL);
 
     print_array (*array);
 
-    i = options.num_threads;
+    i = options.num_threads * 2;
     while ( i -- > 0 )
         free (threads[i].arguments);
 
