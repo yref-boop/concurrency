@@ -14,17 +14,21 @@ struct array {
     int size;
     int *values;
     pthread_mutex_t **value_mutexes;
-    int iterations;
-    pthread_mutex_t *iterations_mutex;
+    int increment_iterations;
+    pthread_mutex_t *increment_mutex;
+    int swap_iterations;
+    pthread_mutex_t *swap_mutex;
 };
 
 void initialize_array (struct array *array, int array_size) {
 
     pthread_mutex_t **value_mutexes;
     pthread_mutex_t *iterations_mutex;
+    pthread_mutex_t *swap_mutex;
 
     array -> size = array_size;
-    array -> iterations = 0;
+    array -> increment_iterations = 0;
+    array -> swap_iterations = 0;
     array -> values  = malloc (array -> size * sizeof (int));
     memset (array -> values, 0, array -> size * sizeof (int));
 
@@ -34,10 +38,17 @@ void initialize_array (struct array *array, int array_size) {
         exit (1);
     }
     pthread_mutex_init (iterations_mutex, NULL);
-    array -> iterations_mutex = iterations_mutex;
+    array -> increment_mutex = iterations_mutex;
+
+    swap_mutex = malloc (sizeof (pthread_mutex_t));
+    if (swap_mutex == NULL) {
+        printf ("non enough memory \n");
+        exit(1);
+    }
+    pthread_mutex_init (swap_mutex, NULL);
+    array -> swap_mutex = swap_mutex;
 
     value_mutexes = malloc (sizeof(pthread_mutex_t) * (array -> size));
-
     if (value_mutexes == NULL) {
         printf ("not enough memory\n");
         exit(1);
@@ -85,13 +96,12 @@ void *increment (void *pointer) {
 
         position = rand() % (arguments -> array -> size);
 
-        printf ("increment iteration #%d", arguments -> array -> iterations);
-        if ( arguments -> array -> iterations == 0 ) break;
+        if ( arguments -> array -> increment_iterations == 0 ) break;
         else {
 
-            pthread_mutex_lock (arguments -> array -> iterations_mutex);
-            arguments -> array -> iterations --;
-            pthread_mutex_unlock (arguments -> array -> iterations_mutex);
+            pthread_mutex_lock (arguments -> array -> increment_mutex);
+            arguments -> array -> increment_iterations --;
+            pthread_mutex_unlock (arguments -> array -> increment_mutex);
 
             pthread_mutex_lock (arguments -> array -> value_mutexes [position]);
 
@@ -126,13 +136,12 @@ void *swap (void *pointer) {
             position2 = rand() % (arguments -> array -> size);
         while (position1 == position2);
 
-                    printf ("swap iteration #%d", arguments -> array -> iterations);
-        if ( arguments -> array -> iterations == 0 ) break;
+        if ( arguments -> array -> swap_iterations == 0 ) break;
         else {
 
-            pthread_mutex_lock (arguments -> array -> iterations_mutex);
-            arguments -> array -> iterations --;
-            pthread_mutex_unlock (arguments -> array -> iterations_mutex);
+            pthread_mutex_lock (arguments -> array -> swap_mutex);
+            arguments -> array -> swap_iterations --;
+            pthread_mutex_unlock (arguments -> array -> swap_mutex);
 
             pthread_mutex_lock (arguments -> array -> value_mutexes [position1]);
             if (pthread_mutex_trylock (arguments -> array -> value_mutexes [position2])) {
@@ -170,7 +179,8 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         exit(1);
     }
 
-    array -> iterations = options.iterations;
+    array -> increment_iterations = options.iterations;
+    array -> swap_iterations = options.iterations;
 
     int i = options.num_threads * 2;
     while ( i -- > 0 ) {
@@ -226,7 +236,8 @@ void wait (struct options options, struct array *array, struct thread_info *thre
 		pthread_mutex_destroy (array -> value_mutexes [i]);
 		free (array -> value_mutexes [i]);
     }
-    free (array -> iterations_mutex);
+    free (array -> increment_mutex);
+    free (array -> swap_mutex);
     free (array -> value_mutexes);
     free (threads);
     free (array -> values);
