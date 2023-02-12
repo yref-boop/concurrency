@@ -33,26 +33,18 @@ void initialize_array (struct array *array, int array_size) {
     memset (array -> values, 0, array -> size * sizeof (int));
 
     iterations_mutex = malloc (sizeof (pthread_mutex_t));
-    if (iterations_mutex == NULL) {
+    swap_mutex = malloc (sizeof (pthread_mutex_t));
+    value_mutexes = malloc (sizeof(pthread_mutex_t) * (array -> size));
+
+    if ((iterations_mutex == NULL) || (swap_mutex == NULL) || (value_mutexes == NULL)) {
         printf ("not enough memory\n");
         exit (1);
     }
     pthread_mutex_init (iterations_mutex, NULL);
     array -> increment_mutex = iterations_mutex;
 
-    swap_mutex = malloc (sizeof (pthread_mutex_t));
-    if (swap_mutex == NULL) {
-        printf ("non enough memory \n");
-        exit(1);
-    }
     pthread_mutex_init (swap_mutex, NULL);
     array -> swap_mutex = swap_mutex;
-
-    value_mutexes = malloc (sizeof(pthread_mutex_t) * (array -> size));
-    if (value_mutexes == NULL) {
-        printf ("not enough memory\n");
-        exit(1);
-    }
 
     int i = array -> size;
     while ( i -- >  0 ) {
@@ -92,15 +84,16 @@ void *increment (void *pointer) {
     int delay = arguments -> delay;
     int position, value;
 
-    while ( arguments -> iterations -- ) {
+    while ( 1 ) {
 
         position = rand() % (arguments -> array -> size);
 
-        if ( arguments -> array -> increment_iterations == 0 ) break;
+        if ( arguments -> array -> increment_iterations == arguments -> iterations ) break;
         else {
 
+
             pthread_mutex_lock (arguments -> array -> increment_mutex);
-            arguments -> array -> increment_iterations --;
+            arguments -> array -> increment_iterations ++;
             pthread_mutex_unlock (arguments -> array -> increment_mutex);
 
             pthread_mutex_lock (arguments -> array -> value_mutexes [position]);
@@ -129,18 +122,18 @@ void *swap (void *pointer) {
     int delay = arguments -> delay;
     int position1, position2, aux_value;
 
-    while ( arguments -> iterations -- ) {
+    while ( 1 ) {
 
         position1 = rand() % (arguments -> array -> size);
         do
             position2 = rand() % (arguments -> array -> size);
         while (position1 == position2);
 
-        if ( arguments -> array -> swap_iterations == 0 ) break;
+        if ( arguments -> array -> swap_iterations == arguments -> iterations ) break;
         else {
 
             pthread_mutex_lock (arguments -> array -> swap_mutex);
-            arguments -> array -> swap_iterations --;
+            arguments -> array -> swap_iterations ++;
             pthread_mutex_unlock (arguments -> array -> swap_mutex);
 
             pthread_mutex_lock (arguments -> array -> value_mutexes [position1]);
@@ -179,8 +172,8 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         exit(1);
     }
 
-    array -> increment_iterations = options.iterations;
-    array -> swap_iterations = options.iterations;
+    array -> increment_iterations = 0;
+    array -> swap_iterations = 0;
 
     int i = options.num_threads * 2;
     while ( i -- > 0 ) {
@@ -192,17 +185,15 @@ struct thread_info *start_threads (struct options options, struct array *array) 
         threads[i].arguments -> delay = options.delay;
         threads[i].arguments -> array = array;
 
-        if ( i < options.num_threads) {
-            if (0 != pthread_create (&threads[i].id, NULL, increment, threads[i].arguments)) {
-                printf ("could not create thread #%d", i);
-                exit (1);
-            }
-        }
-        else {
-            if (0 != pthread_create (&threads[i]. id, NULL, swap, threads[i].arguments)) {
-                printf ("could not create thread #%d", i);
-                exit (1);
-            }
+        void* start_function;
+        if ( i < options.num_threads )
+            start_function = increment;
+        else
+            start_function = swap;
+
+        if (0 != pthread_create (&threads[i].id, NULL, start_function, threads[i].arguments)) {
+            printf ("could not create thread #%d", i);
+            exit (1);
         }
     }
     return threads;
@@ -217,6 +208,9 @@ void print_array (struct array array) {
         printf ("%d ", array.values[i]);
     }
     printf ("\ntotal: %d\n", total);
+
+    printf ("increment iterations count: %d\n", array.increment_iterations);
+    printf ("swap iterations count: %d\n", array.swap_iterations);
 }
 
 void wait (struct options options, struct array *array, struct thread_info *threads) {
