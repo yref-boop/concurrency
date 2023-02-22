@@ -10,7 +10,6 @@ struct options {
     char *dir;
 };
 
-int read_options(int argc, char **argv, struct options *opt);
-
+int read_options (int argc, char **argv, struct options *opt);
 
 #endif

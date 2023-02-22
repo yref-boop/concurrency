@@ -32,8 +32,7 @@ static struct option long_options[] = {
 	{0, 0, 0, 0}
 };
 
-static void usage(int i)
-{
+static void usage (int i) {
 	printf(
 		"Usage:  comp [-s | -c] [OPTIONS] DIR FILE\n"
 		"Options:\n"
@@ -46,16 +45,14 @@ static void usage(int i)
 	exit(i);
 }
 
-static int get_int(char *arg, int *value)
-{
+static int get_int (char *arg, int *value) {
 	char *end;
 	*value = strtol(arg, &end, 10);
 
 	return (end != NULL);
 }
 
-int handle_options(int argc, char **argv, struct options *opt)
-{
+int handle_options (int argc, char **argv, struct options *opt) {
 	while (1) {
 		int c;
 		int option_index = 0;
@@ -67,64 +64,62 @@ int handle_options(int argc, char **argv, struct options *opt)
 
 		switch (c) {
 		case 't':
-			if (!get_int(optarg, &opt->num_threads)
-			    || opt->num_threads <= 0) {
-				printf("'%s': is not a valid integer\n",
+			if (!get_int (optarg, &opt -> num_threads)
+			    || opt -> num_threads <= 0) {
+				printf ("'%s': is not a valid integer\n",
 				       optarg);
-				usage(-3);
+				usage (-3);
 			}
 			break;
 
 		case 's':
-            opt->check = false;
+            opt -> check = false;
 			break;
 		case 'q':
-			if (!get_int(optarg, &opt->queue_size)
-			    || opt->queue_size <= 0) {
-				printf("'%s': is not a valid integer\n",
+			if (!get_int (optarg, &opt -> queue_size)
+			    || opt -> queue_size <= 0) {
+				printf ("'%s': is not a valid integer\n",
 				       optarg);
-				usage(-3);
+				usage (-3);
 			}
 			break;
 		case 'c':
-            opt->check= true;
+            opt -> check = true;
 			break;
 		case '?':
 		case 'h':
-			usage(0);
+			usage (0);
 			break;
 
 		default:
 			printf ("?? getopt returned character code 0%o ??\n", c);
-			usage(-1);
+			usage (-1);
 		}
 	}
 
-    if(optind + 2 > argc) {
-        usage(0);
-        exit(0);
+    if (optind + 2 > argc) {
+        usage (0);
+        exit (0);
     } else {
-        opt->dir  = argv[optind];
-        opt->file = argv[optind + 1];
+        opt -> dir  = argv[optind];
+        opt -> file = argv[optind + 1];
     }
-
 	return 0;
 }
 
-int read_options(int argc, char **argv, struct options *opt) {
+int read_options (int argc, char **argv, struct options *opt) {
 
-	int result = handle_options(argc,argv,opt);
+	int result = handle_options (argc,argv,opt);
 
 	if (result != 0)
-		exit(result);
+		exit (result);
 
 	if (argc - optind > 2) {
 		printf ("Too many arguments\n\n");
 		while (optind < argc)
 			printf ("'%s' ", argv[optind++]);
 		printf ("\n");
-		usage(-2);
+		usage (-2);
 	}
-
 	return 0;
 }

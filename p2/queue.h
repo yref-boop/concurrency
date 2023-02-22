@@ -3,10 +3,10 @@
 
 typedef struct _queue *queue;
 
-queue q_create(int size);            // Create a new queue
-int   q_elements(queue q);             // number of elements in a queue
-int   q_insert(queue q, void *elem); // insert an element into a queue
-void *q_remove(queue q);             // remove an element from the queue
-void  q_destroy(queue q);             // destroy a queue.
+queue q_create (int size);              // create a new queue
+int   q_elements (queue q);             // number of elements in a queue
+int   q_insert (queue q, void *elem);   // insert an element into a queue
+void *q_remove (queue q);               // remove an element from the queue
+void  q_destroy (queue q);              // destroy a queue.
 
 #endif

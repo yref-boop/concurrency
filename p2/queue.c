@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <threads.h>
 
 // circular array
 typedef struct _queue {
@@ -10,43 +11,43 @@ typedef struct _queue {
 
 #include "queue.h"
 
-queue q_create(int size) {
-    queue q = malloc(sizeof(_queue));
+queue q_create (int size) {
+    queue q = malloc (sizeof (_queue));
 
-    q->size  = size;
-    q->used  = 0;
-    q->first = 0;
-    q->data  = malloc(size * sizeof(void *));
+    q -> size  = size;
+    q -> used  = 0;
+    q -> first = 0;
+    q -> data  = malloc(size * sizeof(void *));
 
     return q;
 }
 
-int q_elements(queue q) {
-    return q->used;
+int q_elements (queue q) {
+    return q -> used;
 }
+ 
+int q_insert (queue q, void *elem) {
+    if (q -> size == q -> used) return -1;
 
-int q_insert(queue q, void *elem) {
-    if(q->size == q->used) return -1;
-
-    q->data[(q->first + q->used) % q->size] = elem;
-    q->used++;
+    q -> data [(q -> first + q -> used) % q -> size] = elem;
+    q -> used++;
 
     return 0;
 }
 
-void *q_remove(queue q) {
+void *q_remove (queue q) {
     void *res;
-    if(q->used == 0) return NULL;
+    if (q -> used == 0) return NULL;
 
-    res = q->data[q->first];
+    res = q -> data[q -> first];
 
-    q->first = (q->first + 1) % q->size;
-    q->used--;
+    q -> first = (q -> first + 1) % q -> size;
+    q -> used--;
 
     return res;
 }
 
-void q_destroy(queue q) {
-    free(q->data);
-    free(q);
+void q_destroy (queue q) {
+    free (q->data);
+    free (q);
 }
