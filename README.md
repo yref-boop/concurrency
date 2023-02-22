@@ -9,3 +9,5 @@ each thread should iterate a given number of times, increasing a random position
 - e3: add threads that swap values on two different positions
 - e4: change the behaviour of the iterations so that it specifies the number of total iterations for each set of threads
 
+### previous-practicals
+another set of 3 practicals, for more details check its own readme
