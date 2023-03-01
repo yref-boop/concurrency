@@ -101,10 +101,10 @@ int increment (void *pointer) {
 
     while (1) {
 
+        mtx_lock (arguments -> iterations -> increment_mutex);
         if (arguments -> iterations -> increment == arguments -> iterations -> total)
             break;
 
-        mtx_lock (arguments -> iterations -> increment_mutex);
         arguments -> iterations -> increment ++;
         mtx_unlock (arguments -> iterations -> increment_mutex);
 
@@ -137,10 +137,10 @@ int swap (void *pointer) {
 
     while (1) {
 
+        mtx_lock (arguments -> iterations -> swap_mutex);
         if (arguments -> iterations -> swap == arguments -> iterations -> total)
             break;
 
-        mtx_lock (arguments -> iterations -> swap_mutex);
         arguments -> iterations -> swap ++;
         mtx_unlock (arguments -> iterations -> swap_mutex);
 
