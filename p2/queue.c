@@ -23,6 +23,9 @@ queue q_create (int size) {
 
     mtx_t *mutex = malloc (sizeof (mtx_t));
     q -> mutex = mutex;
+
+    mtx_init (q -> mutex, mtx_plain);
+
     return q;
 }
 
@@ -61,6 +64,8 @@ void *q_remove (queue q) {
 }
 
 void q_destroy (queue q) {
-    free (q->data);
+    mtx_destroy (q -> mutex);
+    free (q -> mutex);
+    free (q -> data);
     free (q);
 }
