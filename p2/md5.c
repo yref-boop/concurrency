@@ -8,6 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <openssl/evp.h>
+#include <threads.h>
 
 #include "options.h"
 #include "queue.h"
@@ -25,7 +26,13 @@ struct file_md5 {
 };
 
  
-void get_entries (char *dir, queue q);
+struct scanner_thread_arguments {
+    char *directory;
+    queue queue;
+};
+
+
+int get_entries (void *pointer);
 
 
 void print_hash (struct file_md5 *md5) {
@@ -57,13 +64,11 @@ void read_hash_file (char *file, char *dir, queue q) {
         md5 -> hash      = malloc (hash_len / 2);
         md5 -> hash_size = hash_len / 2;
 
-
         for (int i = 0; i < hash_len; i += 2)
             sscanf (hash + i, "%02hhx", &md5 -> hash[i / 2]);
 
         q_insert (q, md5);
     }
-
     fclose (fp);
 }
 
@@ -75,7 +80,7 @@ void sum_file (struct file_md5 *md5) {
     char *buf;
 
     if ((fp = fopen(md5->file, "r")) == NULL) {
-        printf ("Could not open %s\n", md5 -> file);
+        printf ("could not open %s\n", md5 -> file);
         return;
     }
 
@@ -97,63 +102,79 @@ void sum_file (struct file_md5 *md5) {
 }
 
 
-void recurse (char *entry, void *arg) {
-    queue q = * (queue *) arg;
+void recurse (void *pointer) {
+
+    struct scanner_thread_arguments *arguments = pointer;
     struct stat st;
 
-    stat (entry, &st);
+    stat (arguments -> directory, &st);
 
     if (S_ISDIR (st.st_mode))
-        get_entries (entry, q);
+        get_entries (arguments);
 }
 
 
-void add_files (char *entry, void *arg) {
-    queue q = * (queue *) arg;
+void add_files (void *pointer) {
+
+    struct scanner_thread_arguments *arguments = pointer;
     struct stat st;
 
-    stat (entry, &st);
+    stat (arguments -> directory, &st);
 
     if (S_ISREG (st.st_mode))
-        q_insert (q, strdup (entry));
+        q_insert (arguments -> queue, strdup (arguments -> directory));
 }
 
 
-void walk_dir (char *dir, void (*action)(char *entry, void *arg), void *arg) {
+void walk_dir (void (*action)(void *arg), void *pointer) {
+    struct scanner_thread_arguments *arguments = pointer;
     DIR *d;
     struct dirent *ent;
     char full_path[MAX_PATH];
 
-    if ((d = opendir (dir)) == NULL) {
-        printf ("Could not open dir %s\n", dir);
+    queue queue = arguments -> queue;
+
+    if ((d = opendir (arguments -> directory)) == NULL) {
+        printf ("could not open dir %s\n", arguments -> directory);
         return;
     }
+
+    char *directory = arguments -> directory;
 
     while ((ent = readdir(d)) != NULL) {
         if (strcmp (ent -> d_name, ".") == 0 || strcmp (ent -> d_name, "..") == 0)
             continue;
 
-        snprintf (full_path, MAX_PATH, "%s/%s", dir, ent -> d_name);
-
-        action (full_path, arg);
+        snprintf (full_path, MAX_PATH, "%s/%s", directory, ent -> d_name);
+        arguments -> directory = full_path;
+        action (arguments);
     }
     closedir (d);
 }
 
 
-void get_entries (char *dir, queue q) {
-    walk_dir (dir, add_files, &q);
-    walk_dir (dir, recurse, &q);
+int get_entries (void *pointer) {
+
+    struct scanner_thread_arguments *arguments = pointer;
+
+    char *directory = arguments -> directory;
+    walk_dir (add_files, arguments);
+
+    arguments -> directory = directory;
+    walk_dir (recurse, arguments);
+
+    return (1);
 }
 
 
-void check (struct options opt) {
+void check (struct options options) {
+
     queue in_q;
     struct file_md5 *md5_in, md5_file;
 
-    in_q  = q_create (opt.queue_size);
+    in_q = q_create (options.queue_size);
 
-    read_hash_file (opt.file, opt.dir, in_q);
+    read_hash_file (options.file, options.directory, in_q);
 
     while ((md5_in = q_remove (in_q))) {
         md5_file.file = md5_in -> file;
@@ -167,15 +188,26 @@ void check (struct options opt) {
             print_hash (md5_in);
             printf ("\n");
         }
-
         free (md5_file.hash);
-
-        free (md5_in->file);
-        free (md5_in->hash);
+        free (md5_in -> file);
+        free (md5_in -> hash);
         free (md5_in);
     }
-
     q_destroy (in_q);
+}
+
+
+void start_scan (char *directory, queue queue) {
+
+    thrd_t id;
+    struct scanner_thread_arguments *thread_arguments;
+    thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
+
+    thread_arguments -> directory = directory;
+    thread_arguments -> queue     = queue;
+
+    thrd_create (&id, get_entries, thread_arguments);
+    thrd_join (id, NULL);
 }
 
 
@@ -186,10 +218,10 @@ void sum (struct options opt) {
     struct file_md5 *md5;
     int dirname_len;
 
-    in_q  = q_create (opt.queue_size);
+    in_q  = q_create (1);
     out_q = q_create (opt.queue_size);
 
-    get_entries (opt.dir, in_q);
+    start_scan (opt.directory, in_q);
 
     while ((ent = q_remove (in_q)) != NULL) {
         md5 = malloc (sizeof (struct file_md5));
@@ -205,7 +237,7 @@ void sum (struct options opt) {
         exit (0);
     }
 
-    dirname_len = strlen (opt.dir) + 1; // length of dir + /
+    dirname_len = strlen (opt.directory) + 1; // length of dir + /
 
     while ((md5 = q_remove (out_q)) != NULL) {
         fprintf (out, "%s: ", md5 -> file + dirname_len);
@@ -232,8 +264,8 @@ int main (int argc, char *argv[]) {
     opt.num_threads = 5;
     opt.queue_size  = 1000;
     opt.check       = true;
+    opt.directory   = NULL;
     opt.file        = NULL;
-    opt.dir         = NULL;
 
     read_options (argc, argv, &opt);
 

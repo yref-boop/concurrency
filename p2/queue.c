@@ -61,7 +61,7 @@ void *q_remove (queue q) {
     struct timespec timespec;
     struct timeval timeval;
 
-    // current time +5 secs for timed wait
+    // current time +1 sec for timed wait
     if (gettimeofday (&timeval, NULL) != 0)
         printf ("could not set waiting time");
 

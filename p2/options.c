@@ -101,7 +101,7 @@ int handle_options (int argc, char **argv, struct options *opt) {
         usage (0);
         exit (0);
     } else {
-        opt -> dir  = argv[optind];
+        opt -> directory = argv[optind];
         opt -> file = argv[optind + 1];
     }
 	return 0;
