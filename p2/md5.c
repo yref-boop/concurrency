@@ -40,7 +40,7 @@ struct scanner_thread_info {
 struct hash_thread_arguments {
     queue *out_queue;
     queue *in_queue;
-    mtx_t mutex;
+    mtx_t *mutex;
 };
 
 struct hash_thread_info {
@@ -180,7 +180,33 @@ int get_entries (void *pointer) {
     arguments -> directory = directory;
     walk_dir (recurse, arguments);
 
-    return (1);
+    return 0;
+}
+
+
+int get_hash (void *pointer) {
+
+    struct hash_thread_arguments *arguments = pointer;
+
+    struct file_md5 *md5;
+    char *entry;
+
+    while (1) {
+
+        mtx_lock (arguments -> mutex);
+
+        if ((entry = q_remove (*arguments -> in_queue)) == NULL)
+            break;
+
+        md5 = malloc (sizeof (struct file_md5));
+        md5 -> file = entry;
+        sum_file (md5);
+
+        q_insert (*arguments -> out_queue, md5);
+
+        mtx_unlock (arguments -> mutex);
+    }
+    return 0;
 }
 
 
@@ -214,10 +240,18 @@ void check (struct options options) {
 }
 
 
-void wait (struct scanner_thread_info *scanner_thread) {
+void wait (struct scanner_thread_info *scanner_thread, struct hash_thread_info *hash_threads, struct options options) {
  
     thrd_join (scanner_thread -> id, NULL);
     free (scanner_thread);
+
+    mtx_destroy (hash_threads[0].arguments -> mutex);
+    free (hash_threads[0].arguments -> mutex);
+
+    int count = options.num_threads;
+    while (count -- > 0)
+        free (hash_threads[count].arguments);
+    free (hash_threads);
 }
 
 
@@ -240,12 +274,44 @@ struct scanner_thread_info *start_scanner_thread (struct options options, queue 
     return scanner_thread;
 }
 
+
+struct hash_thread_info *start_hash_threads (struct options options, queue *in_queue, queue *out_queue) {
+
+    struct hash_thread_info *hash_threads;
+    int count = options.num_threads;
+
+    hash_threads = malloc (sizeof (struct hash_thread_info) * count);
+
+    if (hash_threads == NULL) {
+        printf ("not enough memory for hash thread creation\n");
+        exit (1);
+    }
+
+    mtx_t *mutex = malloc (sizeof (mtx_t));
+    mtx_init (mutex, mtx_plain);
+
+    while (count -- > 0) {
+        hash_threads[count].arguments = malloc (sizeof (struct hash_thread_arguments));
+
+        hash_threads[count].arguments -> out_queue = out_queue;
+        hash_threads[count].arguments -> in_queue = in_queue;
+        hash_threads[count].arguments -> mutex = mutex;
+
+        if (0 != thrd_create (&hash_threads[count].id, get_hash, hash_threads[count].arguments)) {
+            printf ("could not create hash thread #%d", count);
+            exit (1);
+        }
+    }
+    return hash_threads;
+}
+
+
 void sum (struct options opt) {
 
     char *ent;
     FILE *out;
-    struct file_md5 *md5;
     int dirname_len;
+    struct file_md5 *md5;
 
     queue in_q  = q_create (1);
     queue out_q = q_create (opt.queue_size);
@@ -253,14 +319,8 @@ void sum (struct options opt) {
     struct scanner_thread_info *scanner_thread;
     scanner_thread = start_scanner_thread (opt, &in_q);
 
-    while ((ent = q_remove (in_q)) != NULL) {
-        md5 = malloc (sizeof (struct file_md5));
-
-        md5 -> file = ent;
-        sum_file (md5);
-
-        q_insert (out_q, md5);
-    }
+    struct hash_thread_info *hash_threads;
+    hash_threads = start_hash_threads (opt, &in_q, &out_q);
 
     if ((out = fopen (opt.file, "w")) == NULL) {
         printf ("Could not open output file\n");
@@ -281,11 +341,11 @@ void sum (struct options opt) {
         free (md5);
     }
 
-    wait (scanner_thread);
-
     fclose (out);
     q_destroy (in_q);
     q_destroy (out_q);
+
+    wait (scanner_thread, hash_threads, opt);
 }
 
 
