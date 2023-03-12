@@ -28,7 +28,7 @@ struct file_md5 {
  
 struct scanner_thread_arguments {
     char *directory;
-    queue queue;
+    queue *queue;
 };
 
 
@@ -122,7 +122,7 @@ void add_files (void *pointer) {
     stat (arguments -> directory, &st);
 
     if (S_ISREG (st.st_mode))
-        q_insert (arguments -> queue, strdup (arguments -> directory));
+        q_insert (*arguments -> queue, strdup (arguments -> directory));
 }
 
 
@@ -132,7 +132,7 @@ void walk_dir (void (*action)(void *arg), void *pointer) {
     struct dirent *ent;
     char full_path[MAX_PATH];
 
-    queue queue = arguments -> queue;
+    queue queue = *arguments -> queue;
 
     if ((d = opendir (arguments -> directory)) == NULL) {
         printf ("could not open dir %s\n", arguments -> directory);
@@ -197,31 +197,24 @@ void check (struct options options) {
 }
 
 
-void start_scan (char *directory, queue queue) {
-
-    thrd_t id;
-    struct scanner_thread_arguments *thread_arguments;
-    thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
-
-    thread_arguments -> directory = directory;
-    thread_arguments -> queue     = queue;
-
-    thrd_create (&id, get_entries, thread_arguments);
-    thrd_join (id, NULL);
-}
-
-
 void sum (struct options opt) {
-    queue in_q, out_q;
+
     char *ent;
     FILE *out;
     struct file_md5 *md5;
     int dirname_len;
 
-    in_q  = q_create (1);
-    out_q = q_create (opt.queue_size);
+    queue in_q  = q_create (1);
+    queue out_q = q_create (opt.queue_size);
 
-    start_scan (opt.directory, in_q);
+    thrd_t id;
+    struct scanner_thread_arguments *thread_arguments;
+    thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
+
+    thread_arguments -> directory = opt.directory;
+    thread_arguments -> queue     = &in_q;
+
+    thrd_create (&id, get_entries, thread_arguments);
 
     while ((ent = q_remove (in_q)) != NULL) {
         md5 = malloc (sizeof (struct file_md5));
@@ -251,6 +244,9 @@ void sum (struct options opt) {
         free (md5);
     }
 
+    thrd_join (id, NULL);
+
+    free (thread_arguments);
     fclose (out);
     q_destroy (in_q);
     q_destroy (out_q);
