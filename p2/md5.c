@@ -31,6 +31,11 @@ struct scanner_thread_arguments {
     queue *queue;
 };
 
+struct scanner_thread_info {
+    thrd_t id;
+    struct scanner_thread_arguments *arguments;
+};
+
 
 int get_entries (void *pointer);
 
@@ -196,6 +201,24 @@ void check (struct options options) {
     q_destroy (in_q);
 }
 
+struct scanner_thread_info *start_scanner_thread (struct options options, queue *queue) {
+
+    thrd_t id;
+    struct scanner_thread_info *scanner_thread;
+    scanner_thread = malloc (sizeof (struct scanner_thread_info));
+
+    struct scanner_thread_arguments *thread_arguments;
+    thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
+
+    thread_arguments -> directory = options.directory;
+    thread_arguments -> queue     = queue;
+
+    if (0 != thrd_create (&scanner_thread -> id, get_entries, thread_arguments)) {
+        printf ("could not create scanner thread\n");
+        exit(1);
+    }
+    return scanner_thread;
+}
 
 void sum (struct options opt) {
 
@@ -207,14 +230,8 @@ void sum (struct options opt) {
     queue in_q  = q_create (1);
     queue out_q = q_create (opt.queue_size);
 
-    thrd_t id;
-    struct scanner_thread_arguments *thread_arguments;
-    thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
-
-    thread_arguments -> directory = opt.directory;
-    thread_arguments -> queue     = &in_q;
-
-    thrd_create (&id, get_entries, thread_arguments);
+    struct scanner_thread_info *scanner_thread;
+    scanner_thread = start_scanner_thread (opt, &in_q);
 
     while ((ent = q_remove (in_q)) != NULL) {
         md5 = malloc (sizeof (struct file_md5));
@@ -244,9 +261,9 @@ void sum (struct options opt) {
         free (md5);
     }
 
-    thrd_join (id, NULL);
+    thrd_join (scanner_thread -> id, NULL);
 
-    free (thread_arguments);
+    free (scanner_thread);
     fclose (out);
     q_destroy (in_q);
     q_destroy (out_q);
