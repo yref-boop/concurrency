@@ -37,6 +37,18 @@ struct scanner_thread_info {
 };
 
 
+struct hash_thread_arguments {
+    queue *out_queue;
+    queue *in_queue;
+    mtx_t mutex;
+};
+
+struct hash_thread_info {
+    thrd_t id;
+    struct hash_thread_arguments *arguments;
+};
+
+
 int get_entries (void *pointer);
 
 
@@ -201,6 +213,14 @@ void check (struct options options) {
     q_destroy (in_q);
 }
 
+
+void wait (struct scanner_thread_info *scanner_thread) {
+ 
+    thrd_join (scanner_thread -> id, NULL);
+    free (scanner_thread);
+}
+
+
 struct scanner_thread_info *start_scanner_thread (struct options options, queue *queue) {
 
     thrd_t id;
@@ -261,9 +281,8 @@ void sum (struct options opt) {
         free (md5);
     }
 
-    thrd_join (scanner_thread -> id, NULL);
+    wait (scanner_thread);
 
-    free (scanner_thread);
     fclose (out);
     q_destroy (in_q);
     q_destroy (out_q);
