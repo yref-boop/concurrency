@@ -49,6 +49,17 @@ struct hash_thread_info {
 };
 
 
+struct writer_thread_arguments {
+    struct options options;
+    queue *queue;
+};
+
+struct writer_thread_info {
+    thrd_t id;
+    struct writer_thread_arguments *arguments;
+};
+
+
 int get_entries (void *pointer);
 
 
@@ -180,6 +191,7 @@ int get_entries (void *pointer) {
     arguments -> directory = directory;
     walk_dir (recurse, arguments);
 
+    arguments -> directory = directory;
     return 0;
 }
 
@@ -207,6 +219,36 @@ int get_hash (void *pointer) {
         mtx_unlock (arguments -> mutex);
     }
     return 0;
+}
+
+
+int write_entries (void *pointer) {
+
+    struct writer_thread_arguments *arguments = pointer;
+
+    FILE *out;
+    struct file_md5 *md5;
+    int dirname_len;
+
+    if ((out = fopen (arguments -> options.file, "w")) == NULL) {
+        printf ("could not open output file \n");
+        exit(0);
+    }
+
+    dirname_len = strlen (arguments -> options.directory) + 1;
+    while (1) {
+        if ((md5 = q_remove (*arguments -> queue)) == NULL)
+            break;
+        for (int i = 0; i < md5 -> hash_size; i++)
+            fprintf (out, "%02hhx", md5 -> hash[i]);
+        fprintf (out, "\n");
+
+        free (md5 -> file);
+        free (md5 -> hash);
+        free (md5);
+    }
+    fclose (out);
+    return (0);
 }
 
 
@@ -240,7 +282,7 @@ void check (struct options options) {
 }
 
 
-void wait (struct scanner_thread_info *scanner_thread, struct hash_thread_info *hash_threads, struct options options) {
+void wait (struct scanner_thread_info *scanner_thread, struct hash_thread_info *hash_threads, struct options options, struct writer_thread_info *writer_thread) {
  
     thrd_join (scanner_thread -> id, NULL);
     free (scanner_thread);
@@ -250,8 +292,15 @@ void wait (struct scanner_thread_info *scanner_thread, struct hash_thread_info *
 
     int count = options.num_threads;
     while (count -- > 0)
+        thrd_join (hash_threads[count].id, NULL);
+    count = options.num_threads;
+    while (count -- > 0)
         free (hash_threads[count].arguments);
     free (hash_threads);
+
+    thrd_join (writer_thread -> id, NULL);
+    free (writer_thread);
+
 }
 
 
@@ -261,13 +310,13 @@ struct scanner_thread_info *start_scanner_thread (struct options options, queue 
     struct scanner_thread_info *scanner_thread;
     scanner_thread = malloc (sizeof (struct scanner_thread_info));
 
-    struct scanner_thread_arguments *thread_arguments;
-    thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
+    struct scanner_thread_arguments thread_arguments;
+    //thread_arguments = malloc (sizeof (struct scanner_thread_arguments));
 
-    thread_arguments -> directory = options.directory;
-    thread_arguments -> queue     = queue;
+    thread_arguments.directory = options.directory;
+    thread_arguments.queue     = queue;
 
-    if (0 != thrd_create (&scanner_thread -> id, get_entries, thread_arguments)) {
+    if (0 != thrd_create (&scanner_thread -> id, get_entries, &thread_arguments)) {
         printf ("could not create scanner thread\n");
         exit(1);
     }
@@ -306,12 +355,28 @@ struct hash_thread_info *start_hash_threads (struct options options, queue *in_q
 }
 
 
+struct writer_thread_info *start_writer_thread (struct options options, queue *queue) {
+
+    thrd_t id;
+    struct writer_thread_info *writer_thread;
+    writer_thread = malloc (sizeof (struct writer_thread_info));
+
+    struct writer_thread_arguments thread_arguments;
+
+    thread_arguments.options = options;
+    thread_arguments.queue   = queue;
+
+    if (0 != thrd_create (&writer_thread -> id, write_entries, &thread_arguments)) {
+        printf ("could not create writer thread\n");
+        exit(1);
+    }
+
+    return writer_thread;
+}
+
+
 void sum (struct options opt) {
 
-    char *ent;
-    FILE *out;
-    int dirname_len;
-    struct file_md5 *md5;
 
     queue in_q  = q_create (1);
     queue out_q = q_create (opt.queue_size);
@@ -322,30 +387,13 @@ void sum (struct options opt) {
     struct hash_thread_info *hash_threads;
     hash_threads = start_hash_threads (opt, &in_q, &out_q);
 
-    if ((out = fopen (opt.file, "w")) == NULL) {
-        printf ("Could not open output file\n");
-        exit (0);
-    }
+    struct writer_thread_info *writer_thread;
+    writer_thread = start_writer_thread (opt, &out_q);
 
-    dirname_len = strlen (opt.directory) + 1; // length of dir + /
-
-    while ((md5 = q_remove (out_q)) != NULL) {
-        fprintf (out, "%s: ", md5 -> file + dirname_len);
-
-        for (int i = 0; i < md5 -> hash_size; i++)
-            fprintf (out, "%02hhx", md5 -> hash[i]);
-        fprintf (out, "\n");
-
-        free (md5 -> file);
-        free (md5 -> hash);
-        free (md5);
-    }
-
-    fclose (out);
     q_destroy (in_q);
     q_destroy (out_q);
 
-    wait (scanner_thread, hash_threads, opt);
+    wait (scanner_thread, hash_threads, opt, writer_thread);
 }
 
 
