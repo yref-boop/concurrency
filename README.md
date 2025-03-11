@@ -1,6 +1,9 @@
 # concurrency
 repo for concurrency practicals development: there are 4 different folders, 3 for current practicals & the other for older practicals
 
+### libraries & tecnologies:
+`gcc`, `openssl`
+
 ### p1 concurrent array
 implementation of a program in which several threads share an integer array, initialized to 0s
 each thread should iterate a given number of times, increasing a random position in the array by 1
@@ -9,5 +12,10 @@ each thread should iterate a given number of times, increasing a random position
 - e3: add threads that swap values on two different positions
 - e4: change the behaviour of the iterations so that it specifies the number of total iterations for each set of threads
 
+### p2 md5
+compute the checksum of a given file
+
 ### previous-practicals
 another set of 3 practicals, for more details check its own readme
+
+in order to compile the practicals, `MAKEFILES` are available, just `make` inside the folders.
